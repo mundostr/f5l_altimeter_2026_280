@@ -14,8 +14,8 @@ A lightweight, high-performance altimeter and motor limiter for F5L (RES) model 
 
 | Function | XIAO Pin | GPIO | Notes |
 | :--- | :--- | :--- | :--- |
-| **PWM Input** GPIO 2 | Signal from RC Receiver |
-| **PWM Output** GPIO 3 | Signal to ESC |
+| **PWM Input** | GPIO 2 | Signal from RC Receiver |
+| **PWM Output** | GPIO 3 | Signal to ESC |
 | **I2C SDA** | GPIO 6 | BMP280 Data |
 | **I2C SCL** | GPIO 7 | BMP280 Clock |
 
