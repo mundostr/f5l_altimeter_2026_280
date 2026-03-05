@@ -26,7 +26,7 @@
 #define ALTITUDE_LIMIT_M            90.0f
 #define DEFAULT_THROTTLE_MIN        1000
 #define DEFAULT_THROTTLE_MAX        2000
-#define FAILSAFE_TIMEOUT_US         50000
+#define FAILSAFE_TIMEOUT_US         100000
 #define ESC_UPDATE_PERIOD_MS        5
 #define MAX_CLIMB_RATE_MPS          15.0f
 #define MAX_SINK_RATE_MPS           20.0f
@@ -56,6 +56,6 @@ static rmt_channel_handle_t rx_chan = NULL;
 static rmt_channel_handle_t esc_chan = NULL;
 static bool esc_ramp_active = false;
 static uint16_t esc_ramp_value = 0;
-static const uint16_t ESC_RAMP_STEP = 40; // µs per cycle
+static const uint16_t ESC_RAMP_STEP = 20; // µs per cycle
 static bool throttle_armed = false;
 static rmt_encoder_handle_t esc_encoder = NULL;

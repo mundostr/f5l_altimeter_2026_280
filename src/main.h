@@ -44,15 +44,8 @@ float limit_vertical_speed(float altitude) {
     return altitude;
 }
 
-/* float calculate_altitude(float pressure_pa) {
-    float altitude = (g_pressure_zero - pressure_pa) / 12.0f;
-
-    if (altitude < 0.0f) altitude = 0.0f;
-
-    return altitude;
-} */
-
 float calculate_altitude(float pressure_pa) {
+    // float altitude = (g_pressure_zero - pressure_pa) / 12.0f;
     float altitude = 44330.0f * (1.0f - powf(pressure_pa / g_pressure_zero, 0.190295f));
 
     if (altitude < 0.0f) altitude = 0.0f;
@@ -294,12 +287,13 @@ bool pwm_failsafe() {
 
 void bmp280_task(void *pvParameters) {
     bmp280_params_t params = {};
+    bmp280_init_default_params(&params);
+    
     params.mode = BMP280_MODE_NORMAL;
     params.oversampling_pressure = BMP280_ULTRA_HIGH_RES;
     params.oversampling_temperature = BMP280_STANDARD;
     params.filter = BMP280_FILTER_16;
     params.standby = BMP280_STANDBY_62;
-    bmp280_init_default_params(&params);
     
     bmp280_t dev;
     memset(&dev, 0, sizeof(bmp280_t));
@@ -334,7 +328,7 @@ void bmp280_task(void *pvParameters) {
 }
 
 void enable_bmp280() {
-    xTaskCreatePinnedToCore(bmp280_task, "bmp280_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
+    xTaskCreatePinnedToCore(bmp280_task, "bmp280_task", 8192, NULL, 5, NULL, APP_CPU_NUM);
 }
 
 void esc_task(void *arg) {
