@@ -37,17 +37,15 @@
 static const char *TAG = "ALTMTR280";
 const float alpha_filter = 0.15f;
 
+static float g_temperature_zero = 15.0f;
 static float g_pressure_zero = 0.0f;
 static float g_altitude_filtered = 0.0f;
 static float g_altitude_peak = 0.0f;
-static bool g_motor_run = false;
 static bool g_motor_enabled = false;
 static int64_t g_motor_start_time = 0;
 static float alt_buf[3] = {0};
 static int alt_idx = 0;
 static float altitude_last = 0.0f;
-static bool throttle_learning = true;
-static int64_t throttle_learn_start = 0;
 uint16_t throttle_min = DEFAULT_THROTTLE_MAX; // updated later according to throttle pulse
 uint16_t throttle_max = DEFAULT_THROTTLE_MAX;
 static volatile uint16_t rx_pulse_us = DEFAULT_THROTTLE_MIN;
