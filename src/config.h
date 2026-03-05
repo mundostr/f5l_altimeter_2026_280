@@ -24,12 +24,15 @@
 #define ALTITUDE_REPORT_FREQ        200
 #define MOTOR_MAX_TIME_MS           30000
 #define ALTITUDE_LIMIT_M            90.0f
+#define SAFE_THROTTLE_MIN           800
+#define SAFE_THROTTLE_MAX           2200
 #define DEFAULT_THROTTLE_MIN        1000
 #define DEFAULT_THROTTLE_MAX        2000
 #define FAILSAFE_TIMEOUT_US         100000
 #define ESC_UPDATE_PERIOD_MS        5
 #define MAX_CLIMB_RATE_MPS          15.0f
 #define MAX_SINK_RATE_MPS           20.0f
+#define CALIBRATION_INIT_DELAY_MS   1500
 #ifndef APP_CPU_NUM
 #define APP_CPU_NUM PRO_CPU_NUM
 #endif
@@ -39,6 +42,7 @@ const float alpha_filter = 0.15f;
 
 static float g_temperature_zero = 15.0f;
 static float g_pressure_zero = 0.0f;
+static float g_pressure_filtered = 0.0f;
 static float g_altitude_filtered = 0.0f;
 static float g_altitude_peak = 0.0f;
 static bool g_motor_enabled = false;

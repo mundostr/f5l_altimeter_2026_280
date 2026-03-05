@@ -44,9 +44,18 @@ float limit_vertical_speed(float altitude) {
     return altitude;
 }
 
-float calculate_altitude(float pressure_pa) {
-    // float altitude = (g_pressure_zero - pressure_pa) / 12.0f;
-    float altitude = 44330.0f * (1.0f - powf(pressure_pa / g_pressure_zero, 0.190295f));
+float calculate_altitude(float pressure_pa, float temperature_c) {
+    // Hypsometric equation with temperature compensation
+    // Uses actual temperature instead of assuming ISA (15°C)
+    // h = (R * T_avg / g) * ln(P0/P)
+    // Where R = 287.05 J/(kg·K), g = 9.80665 m/s², T in Kelvin
+
+    float t_kelvin = 273.15f + temperature_c;
+    float t_zero_kelvin = 273.15f + g_temperature_zero;
+    float t_avg = (t_zero_kelvin + t_kelvin) / 2.0f;
+
+    // R/g ≈ 29.271 m/K
+    float altitude = 29.271f * t_avg * logf(g_pressure_zero / pressure_pa);
 
     if (altitude < 0.0f) altitude = 0.0f;
 
@@ -68,36 +77,50 @@ float median_filter(float new_alt) {
     return median3(alt_buf[0], alt_buf[1], alt_buf[2]);
 }
 
-float filter_altitude(float new_alt) {
-    g_altitude_filtered += alpha_filter * (new_alt - g_altitude_filtered);
-
-    return g_altitude_filtered;
+float filter_pressure(float pressure) {
+    if (g_pressure_filtered == 0.0f) {
+        g_pressure_filtered = pressure;
+    } else {
+        g_pressure_filtered += alpha_filter * (pressure - g_pressure_filtered);
+    }
+    return g_pressure_filtered;
 }
 
 void calibrate_zero(bmp280_t *dev) {
-    const int discard = 20; // discard unstable readings
-    const int samples = 80; // valid samples used for average
+    const int discard = 20;
+    const int samples = 80;
 
     float pressure, temperature, humidity;
-    float values[samples];
+    float pressure_values[samples];
+    float temp_values[samples];
 
     int valid = 0;
     int total = discard + samples;
 
+    vTaskDelay(pdMS_TO_TICKS(CALIBRATION_INIT_DELAY_MS));
+
     for (int i = 0; i < total; i++) {
         if (bmp280_read_float(dev, &temperature, &pressure, &humidity) == ESP_OK) {
-            if (i >= discard) values[valid++] = pressure;
+            if (i >= discard) {
+                pressure_values[valid] = pressure;
+                temp_values[valid] = temperature;
+                valid++;
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
+    // Sort pressure values and apply same ordering to temperature (paired)
     for (int i = 0; i < valid - 1; i++) {
         for (int j = i + 1; j < valid; j++) {
-            if (values[j] < values[i]) {
-                float t = values[i];
-                values[i] = values[j];
-                values[j] = t;
+            if (pressure_values[j] < pressure_values[i]) {
+                float t = pressure_values[i];
+                pressure_values[i] = pressure_values[j];
+                pressure_values[j] = t;
+                t = temp_values[i];
+                temp_values[i] = temp_values[j];
+                temp_values[j] = t;
             }
         }
     }
@@ -106,17 +129,20 @@ void calibrate_zero(bmp280_t *dev) {
     int start = valid * 0.1;
     int end   = valid * 0.9;
 
-    float sum = 0;
+    float pressure_sum = 0;
+    float temp_sum = 0;
     int count = 0;
 
     for (int i = start; i < end; i++) {
-        sum += values[i];
+        pressure_sum += pressure_values[i];
+        temp_sum += temp_values[i];
         count++;
     }
 
-    g_pressure_zero = sum / count;
+    g_pressure_zero = pressure_sum / count;
+    g_temperature_zero = temp_sum / count;
 
-    printf("Ground pressure calibrated: %.2f Pa\n", g_pressure_zero);
+    printf("Ground calibrated: %.2f Pa, %.2f C\n", g_pressure_zero, g_temperature_zero);
 }
 
 void update_peak_altitude(float altitude) {
@@ -164,12 +190,6 @@ void check_rules(float altitude) {
     }
 }
 
-uint16_t read_throttle_us() {
-    // placeholder, will return the measured PWM width from CH3
-
-    return 1000;
-}
-
 void learn_throttle_range() {
     const int samples = 30;
     uint32_t sum = 0;
@@ -177,7 +197,7 @@ void learn_throttle_range() {
     vTaskDelay(pdMS_TO_TICKS(100));
 
     for(int i = 0; i < samples; i++) {
-        uint16_t v = read_throttle_us();
+        uint16_t v = rx_pulse_us;
         sum += v;
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -208,8 +228,12 @@ bool pwm_rx_callback(rmt_channel_handle_t chan, const rmt_rx_done_event_data_t *
 
     uint32_t high_time = sym.duration0;
 
-    rx_pulse_us = high_time;
-    last_rx_time = esp_timer_get_time();
+    // Validate pulse width (800-2200µs is valid servo range)
+    // Out-of-range pulses are ignored (EMI protection)
+    if (high_time >= SAFE_THROTTLE_MIN && high_time <= SAFE_THROTTLE_MAX) {
+        rx_pulse_us = high_time;
+        last_rx_time = esp_timer_get_time();
+    }
 
     return false;
 }
@@ -309,20 +333,36 @@ void bmp280_task(void *pvParameters) {
     // motor_start(); // DISABLE!, just for testing
 
     for(;;) {
-        if (bmp280_read_float(&dev, &temperature, &pressure, &humidity) != ESP_OK) {
-            printf("Reading failed\n");
+        // Retry logic for I2C/EMI resilience
+        float pressure, temperature, humidity;
+        bool read_ok = false;
+
+        for (int retry = 0; retry < 3; retry++) {
+            if (bmp280_read_float(&dev, &temperature, &pressure, &humidity) == ESP_OK) {
+                read_ok = true;
+                break;
+            }
+            if (retry < 2) {
+                vTaskDelay(pdMS_TO_TICKS(5));
+            }
+        }
+
+        if (!read_ok) {
+            printf("BMP280 read failed after 3 retries\n");
+            vTaskDelay(pdMS_TO_TICKS(ALTITUDE_REPORT_FREQ));
             continue;
         }
 
-        float altitude_raw = calculate_altitude(pressure);
+        // Filter pressure first, then calculate altitude (no altitude filter memory)
+        float pressure_flt = filter_pressure(pressure);
+        float altitude_raw = calculate_altitude(pressure_flt, temperature);
         float altitude_med = median_filter(altitude_raw);
-        float altitude_flt = filter_altitude(altitude_med);
-        float altitude = limit_vertical_speed(altitude_flt);
+        float altitude = limit_vertical_speed(altitude_med);
         update_peak_altitude(altitude);
         check_rules(altitude);
-        
+
         printf("Alt %.2f, Pre %.2f, Tmp %.2f, Pck: %.2f\n", altitude, pressure, temperature, g_altitude_peak);
-        
+
         vTaskDelay(pdMS_TO_TICKS(ALTITUDE_REPORT_FREQ));
     }
 }
