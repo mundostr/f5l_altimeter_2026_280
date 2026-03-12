@@ -9,3 +9,4 @@
 *.py
 *.old
 /managed_components/
+/_SUPPORT/
