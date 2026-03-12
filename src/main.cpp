@@ -17,10 +17,10 @@
 #include "sdkconfig.h"
 
 /* ─── Pin definitions ───────────────────────────────────────────────────── */
-#define PIN_SCK                 GPIO_NUM_8
-#define PIN_MISO                GPIO_NUM_9
-#define PIN_MOSI                GPIO_NUM_10
-#define PIN_CS                  GPIO_NUM_20
+#define PIN_SCK                 GPIO_NUM_10 // GPIO_NUM_8
+#define PIN_MISO                GPIO_NUM_20 // GPIO_NUM_9
+#define PIN_MOSI                GPIO_NUM_9 // GPIO_NUM_10
+#define PIN_CS                  GPIO_NUM_8 // GPIO_NUM_20
 #define THR_IN_PIN              GPIO_NUM_3
 #define ESC_OUT_PIN             GPIO_NUM_21
 
