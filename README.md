@@ -96,3 +96,6 @@ Receiver CH3 ──► GPIO ISR (pulse width measure) ──► state machine
     - CLIMB   | Peak:  +45.30 m   T+12s   Thr:  87%
     - COAST   | Peak:  +67.43 m   Alt: +61.20 m
     - Set constant SERIAL_REPORT_ENABLED to enable / disable this log.
+
+## Todo
+    - Organize code in modules as usual (config, helpers, etc), it will be done after first testings.
